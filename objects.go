@@ -48,7 +48,7 @@ var containers = []string{
   "(c)wrt", "(c)con", "(c)dir", "cprt", "desc", "(c)lyr", "(c)nrt",
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
-  "atID", "tmpo", "sonm", "soal", "soar", "soco",
+  "atID", "cmID", "tmpo", "sonm", "soal", "soar", "soco",
   "soaa", "cpil", "cnID", "sfID", "stik",
 }
 
@@ -317,6 +317,10 @@ type MP4Tags struct {
 	ItunesAdvisory ItunesAdvisory
 	ItunesAlbumID int32
 	ItunesArtistID int32
+	// ItunesArtistIDs and ItunesComposerIDs hold ordered native atID and cmID values.
+	// An empty non-nil slice clears the corresponding tag.
+	ItunesArtistIDs []uint64
+	ItunesComposerIDs []uint64
 	// ItunesCatalogID is the native cnID. Zero means absent.
 	ItunesCatalogID uint32
 	// ItunesStorefrontID is the native sfID. Zero means absent.

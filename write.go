@@ -140,6 +140,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "itunesartistid") {
 		mergedTags.ItunesArtistID = 0
+		mergedTags.ItunesArtistIDs = nil
 	}
 
 	if containsStr(delStrings,  "lyrics") {
@@ -293,8 +294,18 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.ItunesAlbumID = tags.ItunesAlbumID
 	}
 
-	if tags.ItunesArtistID > 0 {
+	if containsStr(delStrings, "itunescomposerid") {
+		mergedTags.ItunesComposerIDs = nil
+	}
+	if tags.ItunesArtistIDs != nil {
+		mergedTags.ItunesArtistIDs = tags.ItunesArtistIDs
+		mergedTags.ItunesArtistID = 0
+	} else if tags.ItunesArtistID > 0 {
 		mergedTags.ItunesArtistID = tags.ItunesArtistID
+		mergedTags.ItunesArtistIDs = nil
+	}
+	if tags.ItunesComposerIDs != nil {
+		mergedTags.ItunesComposerIDs = tags.ItunesComposerIDs
 	}
 	if tags.ItunesCatalogID != 0 {
 		mergedTags.ItunesCatalogID = tags.ItunesCatalogID
@@ -806,30 +817,35 @@ func writeItunesAlbumID(f *os.File, albumID int32) error {
 	return err
 }
 
-func writeItunesArtistID(f *os.File, artistID int32) error {
-	_, err := f.Write([]byte{0x0, 0x0, 0x0, 0x1C})
-	if err != nil {
-		return err
-	}	
-	_, err = f.WriteString("atID")
-	if err != nil {
+func writeItunesIDs(f *os.File, name string, ids []uint64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	var data bytes.Buffer
+	for _, id := range ids {
+		if id == 0 || id > math.MaxInt64 {
+			return fmt.Errorf("invalid iTunes ID for %s: %d", name, id)
+		}
+		width := 4
+		if id > math.MaxInt32 {
+			width = 8
+		}
+		var value [8]byte
+		binary.BigEndian.PutUint64(value[:], id)
+		var header [16]byte
+		binary.BigEndian.PutUint32(header[:4], uint32(16+width))
+		copy(header[4:8], "data")
+		binary.BigEndian.PutUint32(header[8:12], 21)
+		data.Write(header[:])
+		data.Write(value[8-width:])
+	}
+	var header [8]byte
+	binary.BigEndian.PutUint32(header[:4], uint32(len(header)+data.Len()))
+	copy(header[4:], name)
+	if _, err := f.Write(header[:]); err != nil {
 		return err
 	}
-	_, err = f.Write([]byte{0x0, 0x0, 0x0, 0x14})
-	if err != nil {
-		return err
-	}
-	_, err = f.WriteString("data")
-	if err != nil {
-		return err
-	}
-	_, err = f.Write(
-		[]byte{0x0, 0x0, 0x0, 0x15, 0x0, 0x0, 0x0, 0x0})
-	if err != nil {
-		return err
-	}
-	artistIDBytes := putI32BE(artistID)
-	_, err = f.Write(artistIDBytes)
+	_, err := data.WriteTo(f)
 	return err
 }
 
@@ -1288,11 +1304,15 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}
 
-	if tags.ItunesArtistID > 0  {
-		err = writeItunesArtistID(f, tags.ItunesArtistID)
-		if err != nil {
-			return err
-		}
+	artistIDs := tags.ItunesArtistIDs
+	if len(artistIDs) == 0 && tags.ItunesArtistID > 0 {
+		artistIDs = []uint64{uint64(tags.ItunesArtistID)}
+	}
+	if err := writeItunesIDs(f, "atID", artistIDs); err != nil {
+		return err
+	}
+	if err := writeItunesIDs(f, "cmID", tags.ItunesComposerIDs); err != nil {
+		return err
 	}
 	if tags.ItunesCatalogID != 0 {
 		var catalogID [4]byte

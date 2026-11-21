@@ -381,17 +381,24 @@ func (mp4 MP4) readITAlbumID(boxes MP4Boxes) (int32, error) {
 	return id, err
 }
 
-func (mp4 MP4) readITArtistID(boxes MP4Boxes) (int32, error) {
-	box := boxes.getBoxByPath("moov.udta.meta.ilst.atID.data")
-	if box == nil {
-		return -1, nil
+func (mp4 MP4) readItunesIDs(boxes MP4Boxes, name string) ([]uint64, error) {
+	var ids []uint64
+	for _, box := range boxes.getBoxesByPath("moov.udta.meta.ilst." + name + ".data") {
+		offset := box.HeaderSize + 8
+		width := box.BoxSize - offset
+		if width != 4 && width != 8 {
+			return nil, fmt.Errorf("invalid integer payload size for %s", name)
+		}
+		if _, err := mp4.f.Seek(box.StartOffset+offset, io.SeekStart); err != nil {
+			return nil, err
+		}
+		var data [8]byte
+		if _, err := io.ReadFull(mp4.f, data[8-width:]); err != nil {
+			return nil, err
+		}
+		ids = append(ids, binary.BigEndian.Uint64(data[:]))
 	}
-	_, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart)
-	if err != nil {
-		return -1, err
-	}
-	id, err := mp4.readI32BE()
-	return id, err
+	return ids, nil
 }
 
 func (mp4 MP4) readCompilation(boxes MP4Boxes) (*bool, error) {
@@ -583,9 +590,17 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		return nil, err
 	}
 
-	artistID, err := mp4.readITArtistID(boxes)
+	artistIDs, err := mp4.readItunesIDs(boxes, "atID")
 	if err != nil  {
 		return nil, err
+	}
+	composerIDs, err := mp4.readItunesIDs(boxes, "cmID")
+	if err != nil {
+		return nil, err
+	}
+	artistID := int32(-1)
+	if len(artistIDs) > 0 && artistIDs[0] <= math.MaxInt32 {
+		artistID = int32(artistIDs[0])
 	}
 
 	albumArtistSorts, err := mp4.readTextValues(boxes, "soaa")
@@ -659,6 +674,8 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		ItunesAdvisory: advisory,
 		ItunesAlbumID: albumID,
 		ItunesArtistID: artistID,
+		ItunesArtistIDs: artistIDs,
+		ItunesComposerIDs: composerIDs,
 		ItunesCatalogID: catalogID,
 		ItunesStorefrontID: storefrontID,
 		ItunesMediaType: mediaType,
