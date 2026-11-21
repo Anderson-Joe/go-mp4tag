@@ -84,6 +84,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "conductor") {
 		mergedTags.Conductor = ""
+		mergedTags.Conductors = nil
 	}
 
 	if containsStr(delStrings,  "copyright") {
@@ -142,6 +143,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	}
 	if containsStr(delStrings, "itunesgenreid") {
 		mergedTags.ItunesGenreID = 0
+		mergedTags.ItunesGenreIDs = nil
 	}
 	if containsStr(delStrings, "itunesmediatype") {
 		mergedTags.ItunesMediaType = nil
@@ -255,8 +257,17 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.ComposerSort = tags.ComposerSort
 		mergedTags.ComposerSorts = nil
 	}
-	if tags.Conductor != "" {
+	mergedRoles := mergedTags.nativeCreditLists()
+	for i, role := range tags.nativeCreditLists() {
+		if *role.values != nil {
+			*mergedRoles[i].values = *role.values
+		}
+	}
+	if tags.Conductors != nil {
+		mergedTags.Conductor = ""
+	} else if tags.Conductor != "" {
 		mergedTags.Conductor = tags.Conductor
+		mergedTags.Conductors = nil
 	}
 
 	if tags.Copyright != "" {
@@ -328,8 +339,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	if tags.ItunesGapless != nil {
 		mergedTags.ItunesGapless = tags.ItunesGapless
 	}
-	if tags.ItunesGenreID != 0 {
+	if tags.ItunesGenreIDs != nil {
+		mergedTags.ItunesGenreIDs = tags.ItunesGenreIDs
+		mergedTags.ItunesGenreID = 0
+	} else if tags.ItunesGenreID != 0 {
 		mergedTags.ItunesGenreID = tags.ItunesGenreID
+		mergedTags.ItunesGenreIDs = nil
 	}
 	if tags.ItunesMediaType != nil {
 		mergedTags.ItunesMediaType = tags.ItunesMediaType
@@ -1295,10 +1310,16 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}	
 
-	if tags.Conductor != "" {
-		err = writeRegular(f, "con", tags.Conductor, true)
-		if err != nil {
+	if len(tags.Conductors) == 0 && tags.Conductor != "" {
+		if err := writeRegular(f, "con", tags.Conductor, true); err != nil {
 			return err
+		}
+	}
+	for _, role := range tags.nativeCreditLists() {
+		if len(*role.values) != 0 {
+			if err := writeTextValues(f, role.atom, *role.values); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1360,12 +1381,12 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 			return err
 		}
 	}
-	if tags.ItunesGenreID != 0 {
-		var value [4]byte
-		binary.BigEndian.PutUint32(value[:], tags.ItunesGenreID)
-		if err := writeItunesInteger(f, "geID", value[:]); err != nil {
-			return err
-		}
+	genreIDs := tags.ItunesGenreIDs
+	if len(genreIDs) == 0 && tags.ItunesGenreID != 0 {
+		genreIDs = []uint64{uint64(tags.ItunesGenreID)}
+	}
+	if err := writeItunesIDs(f, "geID", genreIDs); err != nil {
+		return err
 	}
 	if tags.ItunesMediaType != nil {
 		if err := writeItunesInteger(f, "stik", []byte{byte(*tags.ItunesMediaType)}); err != nil {

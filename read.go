@@ -521,10 +521,6 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if len(composerSorts) > 0 {
 		composerSort = composerSorts[0]
 	}
-	conductor, err := mp4.readTag(boxes, "(c)con")
-	if err != nil  {
-		return nil, err
-	}
 	copyright, err := mp4.readTag(boxes, "cprt")
 	if err != nil  {
 		return nil, err
@@ -646,13 +642,13 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		value := gaplessData[0] != 0
 		gapless = &value
 	}
-	genreIDData, err := mp4.readItunesInteger(boxes, "geID", 4)
+	genreIDs, err := mp4.readItunesIDs(boxes, "geID")
 	if err != nil {
 		return nil, err
 	}
 	var genreID uint32
-	if genreIDData != nil {
-		genreID = binary.BigEndian.Uint32(genreIDData)
+	if len(genreIDs) > 0 && genreIDs[0] <= math.MaxUint32 {
+		genreID = uint32(genreIDs[0])
 	}
 	mediaTypeData, err := mp4.readItunesInteger(boxes, "stik", 1)
 	if err != nil {
@@ -683,7 +679,6 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Directors: directors,
 		Composers: composers,
 		ComposerSorts: composerSorts,
-		Conductor: conductor,
 		Copyright: copyright,
 		Custom: custom,
 		CustomGenre: firstGenre,
@@ -702,6 +697,7 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		XID: xid,
 		ItunesGapless: gapless,
 		ItunesGenreID: genreID,
+		ItunesGenreIDs: genreIDs,
 		ItunesMediaType: mediaType,
 		Lyrics: lyrics,
 		Narrator: narrator,
@@ -712,6 +708,19 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		TrackNumber: trackNum,
 		TrackTotal: trackTotal,
 	}
+
+	for _, role := range tags.nativeCreditLists() {
+		name := role.atom
+		if name[0] == 0xa9 {
+			name = "(c)" + name[1:]
+		}
+		values, err := mp4.readTextValues(boxes, name)
+		if err != nil {
+			return nil, err
+		}
+		*role.values = values
+	}
+	tags.Conductor = firstTextValue(tags.Conductors)
 
 	year, err := mp4.readTag(boxes, "(c)day")
 	if err != nil  {
