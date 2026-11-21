@@ -84,6 +84,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "conductor") {
 		mergedTags.Conductor = ""
+		mergedTags.Conductors = nil
 	}
 
 	if containsStr(delStrings,  "copyright") {
@@ -134,12 +135,26 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	if containsStr(delStrings, "itunesstorefrontid") || containsStr(delStrings, "itunescountryid") {
 		mergedTags.ItunesStorefrontID = 0
 	}
+	if containsStr(delStrings, "releasedate") {
+		mergedTags.ReleaseDate = ""
+	}
+	if containsStr(delStrings, "xid") {
+		mergedTags.XID = ""
+	}
+	if containsStr(delStrings, "itunesgapless") {
+		mergedTags.ItunesGapless = nil
+	}
+	if containsStr(delStrings, "itunesgenreid") {
+		mergedTags.ItunesGenreID = 0
+		mergedTags.ItunesGenreIDs = nil
+	}
 	if containsStr(delStrings, "itunesmediatype") {
 		mergedTags.ItunesMediaType = nil
 	}
 
 	if containsStr(delStrings,  "itunesartistid") {
 		mergedTags.ItunesArtistID = 0
+		mergedTags.ItunesArtistIDs = nil
 	}
 
 	if containsStr(delStrings,  "lyrics") {
@@ -245,8 +260,17 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.ComposerSort = tags.ComposerSort
 		mergedTags.ComposerSorts = nil
 	}
-	if tags.Conductor != "" {
+	mergedRoles := mergedTags.nativeCreditLists()
+	for i, role := range tags.nativeCreditLists() {
+		if *role.values != nil {
+			*mergedRoles[i].values = *role.values
+		}
+	}
+	if tags.Conductors != nil {
+		mergedTags.Conductor = ""
+	} else if tags.Conductor != "" {
 		mergedTags.Conductor = tags.Conductor
+		mergedTags.Conductors = nil
 	}
 
 	if tags.Copyright != "" {
@@ -293,14 +317,40 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.ItunesAlbumID = tags.ItunesAlbumID
 	}
 
-	if tags.ItunesArtistID > 0 {
+	if containsStr(delStrings, "itunescomposerid") {
+		mergedTags.ItunesComposerIDs = nil
+	}
+	if tags.ItunesArtistIDs != nil {
+		mergedTags.ItunesArtistIDs = tags.ItunesArtistIDs
+		mergedTags.ItunesArtistID = 0
+	} else if tags.ItunesArtistID > 0 {
 		mergedTags.ItunesArtistID = tags.ItunesArtistID
+		mergedTags.ItunesArtistIDs = nil
+	}
+	if tags.ItunesComposerIDs != nil {
+		mergedTags.ItunesComposerIDs = tags.ItunesComposerIDs
 	}
 	if tags.ItunesCatalogID != 0 {
 		mergedTags.ItunesCatalogID = tags.ItunesCatalogID
 	}
 	if tags.ItunesStorefrontID != 0 {
 		mergedTags.ItunesStorefrontID = tags.ItunesStorefrontID
+	}
+	if tags.ReleaseDate != "" {
+		mergedTags.ReleaseDate = tags.ReleaseDate
+	}
+	if tags.XID != "" {
+		mergedTags.XID = tags.XID
+	}
+	if tags.ItunesGapless != nil {
+		mergedTags.ItunesGapless = tags.ItunesGapless
+	}
+	if tags.ItunesGenreIDs != nil {
+		mergedTags.ItunesGenreIDs = tags.ItunesGenreIDs
+		mergedTags.ItunesGenreID = 0
+	} else if tags.ItunesGenreID != 0 {
+		mergedTags.ItunesGenreID = tags.ItunesGenreID
+		mergedTags.ItunesGenreIDs = nil
 	}
 	if tags.ItunesMediaType != nil {
 		mergedTags.ItunesMediaType = tags.ItunesMediaType
@@ -394,7 +444,10 @@ func putI32BE(n int32) []byte {
 }
 
 func (mp4 MP4) updateChunkOffsets(outF *os.File, boxes MP4Boxes, oldIlistSize, newIlistSize int64) error {
-	delta := newIlistSize - oldIlistSize
+	return mp4.updateChunkOffsetsAt(outF, boxes, newIlistSize-oldIlistSize, 0)
+}
+
+func (mp4 MP4) updateChunkOffsetsAt(outF *os.File, boxes MP4Boxes, delta, shiftFrom int64) error {
 	if delta == 0 {
 		return nil
 	}
@@ -406,12 +459,12 @@ func (mp4 MP4) updateChunkOffsets(outF *os.File, boxes MP4Boxes, oldIlistSize, n
 	}
 
 	for _, stco := range stcos {
-		if err := mp4.updateStcoChunkOffsets(outF, stco, delta); err != nil {
+		if err := mp4.updateStcoChunkOffsets(outF, stco, delta, shiftFrom); err != nil {
 			return fmt.Errorf("update stco offsets: %w", err)
 		}
 	}
 	for _, co64 := range co64s {
-		if err := mp4.updateCo64ChunkOffsets(outF, co64, delta); err != nil {
+		if err := mp4.updateCo64ChunkOffsets(outF, co64, delta, shiftFrom); err != nil {
 			return fmt.Errorf("update co64 offsets: %w", err)
 		}
 	}
@@ -432,7 +485,7 @@ func (mp4 MP4) chunkOffsetCount(box *MP4Box) (int64, error) {
 	return int64(binary.BigEndian.Uint32(raw[:])), nil
 }
 
-func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) error {
+func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta, shiftFrom int64) error {
 	count, err := mp4.chunkOffsetCount(box)
 	if err != nil {
 		return err
@@ -444,7 +497,7 @@ func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	if _, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart); err != nil {
 		return err
 	}
-	if _, err := outF.Seek(box.StartOffset+16, io.SeekStart); err != nil {
+	if _, err := outF.Seek(chunkTablePosition(box, delta, shiftFrom), io.SeekStart); err != nil {
 		return err
 	}
 
@@ -470,7 +523,7 @@ func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	return nil
 }
 
-func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta int64) error {
+func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta, shiftFrom int64) error {
 	count, err := mp4.chunkOffsetCount(box)
 	if err != nil {
 		return err
@@ -482,7 +535,7 @@ func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	if _, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart); err != nil {
 		return err
 	}
-	if _, err := outF.Seek(box.StartOffset+16, io.SeekStart); err != nil {
+	if _, err := outF.Seek(chunkTablePosition(box, delta, shiftFrom), io.SeekStart); err != nil {
 		return err
 	}
 
@@ -806,30 +859,35 @@ func writeItunesAlbumID(f *os.File, albumID int32) error {
 	return err
 }
 
-func writeItunesArtistID(f *os.File, artistID int32) error {
-	_, err := f.Write([]byte{0x0, 0x0, 0x0, 0x1C})
-	if err != nil {
-		return err
-	}	
-	_, err = f.WriteString("atID")
-	if err != nil {
+func writeItunesIDs(f *os.File, name string, ids []uint64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	var data bytes.Buffer
+	for _, id := range ids {
+		if id == 0 || id > math.MaxInt64 {
+			return fmt.Errorf("invalid iTunes ID for %s: %d", name, id)
+		}
+		width := 4
+		if id > math.MaxInt32 {
+			width = 8
+		}
+		var value [8]byte
+		binary.BigEndian.PutUint64(value[:], id)
+		var header [16]byte
+		binary.BigEndian.PutUint32(header[:4], uint32(16+width))
+		copy(header[4:8], "data")
+		binary.BigEndian.PutUint32(header[8:12], 21)
+		data.Write(header[:])
+		data.Write(value[8-width:])
+	}
+	var header [8]byte
+	binary.BigEndian.PutUint32(header[:4], uint32(len(header)+data.Len()))
+	copy(header[4:], name)
+	if _, err := f.Write(header[:]); err != nil {
 		return err
 	}
-	_, err = f.Write([]byte{0x0, 0x0, 0x0, 0x14})
-	if err != nil {
-		return err
-	}
-	_, err = f.WriteString("data")
-	if err != nil {
-		return err
-	}
-	_, err = f.Write(
-		[]byte{0x0, 0x0, 0x0, 0x15, 0x0, 0x0, 0x0, 0x0})
-	if err != nil {
-		return err
-	}
-	artistIDBytes := putI32BE(artistID)
-	_, err = f.Write(artistIDBytes)
+	_, err := data.WriteTo(f)
 	return err
 }
 
@@ -1261,10 +1319,16 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}	
 
-	if tags.Conductor != "" {
-		err = writeRegular(f, "con", tags.Conductor, true)
-		if err != nil {
+	if len(tags.Conductors) == 0 && tags.Conductor != "" {
+		if err := writeRegular(f, "con", tags.Conductor, true); err != nil {
 			return err
+		}
+	}
+	for _, role := range tags.nativeCreditLists() {
+		if len(*role.values) != 0 {
+			if err := writeTextValues(f, role.atom, *role.values); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1288,11 +1352,15 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}
 
-	if tags.ItunesArtistID > 0  {
-		err = writeItunesArtistID(f, tags.ItunesArtistID)
-		if err != nil {
-			return err
-		}
+	artistIDs := tags.ItunesArtistIDs
+	if len(artistIDs) == 0 && tags.ItunesArtistID > 0 {
+		artistIDs = []uint64{uint64(tags.ItunesArtistID)}
+	}
+	if err := writeItunesIDs(f, "atID", artistIDs); err != nil {
+		return err
+	}
+	if err := writeItunesIDs(f, "cmID", tags.ItunesComposerIDs); err != nil {
+		return err
 	}
 	if tags.ItunesCatalogID != 0 {
 		var catalogID [4]byte
@@ -1307,6 +1375,32 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		if err := writeItunesInteger(f, "sfID", storefrontID[:]); err != nil {
 			return err
 		}
+	}
+	if tags.ReleaseDate != "" {
+		if err := writeRegular(f, "rldt", tags.ReleaseDate, false); err != nil {
+			return err
+		}
+	}
+	if tags.XID != "" {
+		if err := writeRegular(f, "xid ", tags.XID, false); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesGapless != nil {
+		var value byte
+		if *tags.ItunesGapless {
+			value = 1
+		}
+		if err := writeItunesInteger(f, "pgap", []byte{value}); err != nil {
+			return err
+		}
+	}
+	genreIDs := tags.ItunesGenreIDs
+	if len(genreIDs) == 0 && tags.ItunesGenreID != 0 {
+		genreIDs = []uint64{uint64(tags.ItunesGenreID)}
+	}
+	if err := writeItunesIDs(f, "geID", genreIDs); err != nil {
+		return err
 	}
 	if tags.ItunesMediaType != nil {
 		if err := writeItunesInteger(f, "stik", []byte{byte(*tags.ItunesMediaType)}); err != nil {
@@ -1448,6 +1542,7 @@ func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
 	if boxes.getBoxByPath("moov.udta.meta.ilst") == nil {
 		return &ErrBoxNotPresent{Msg: "ilst box not present, implement me"}
 	}
+	userData := userDataChanges(mergedTags, tags, delStrings)
 	mergedTags = overwriteTags(mergedTags, tags, delStrings)
 	if err := mp4.replaceCustomValues(mergedTags, tags.ReplaceCustomValues); err != nil {
 		return err
@@ -1456,6 +1551,12 @@ func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
    	err = mp4.writeTags(boxes, mergedTags, tempPath)
 	if err != nil {
 		return err
+	}
+	if len(userData) != 0 {
+		if err := rewriteUserData(tempPath, userData); err != nil {
+			_ = os.Remove(tempPath)
+			return err
+		}
 	}
 	mp4.Close()
 	err = moveMP4(tempPath, mp4.path)

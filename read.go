@@ -381,17 +381,24 @@ func (mp4 MP4) readITAlbumID(boxes MP4Boxes) (int32, error) {
 	return id, err
 }
 
-func (mp4 MP4) readITArtistID(boxes MP4Boxes) (int32, error) {
-	box := boxes.getBoxByPath("moov.udta.meta.ilst.atID.data")
-	if box == nil {
-		return -1, nil
+func (mp4 MP4) readItunesIDs(boxes MP4Boxes, name string) ([]uint64, error) {
+	var ids []uint64
+	for _, box := range boxes.getBoxesByPath("moov.udta.meta.ilst." + name + ".data") {
+		offset := box.HeaderSize + 8
+		width := box.BoxSize - offset
+		if width != 4 && width != 8 {
+			return nil, fmt.Errorf("invalid integer payload size for %s", name)
+		}
+		if _, err := mp4.f.Seek(box.StartOffset+offset, io.SeekStart); err != nil {
+			return nil, err
+		}
+		var data [8]byte
+		if _, err := io.ReadFull(mp4.f, data[8-width:]); err != nil {
+			return nil, err
+		}
+		ids = append(ids, binary.BigEndian.Uint64(data[:]))
 	}
-	_, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart)
-	if err != nil {
-		return -1, err
-	}
-	id, err := mp4.readI32BE()
-	return id, err
+	return ids, nil
 }
 
 func (mp4 MP4) readCompilation(boxes MP4Boxes) (*bool, error) {
@@ -514,10 +521,6 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if len(composerSorts) > 0 {
 		composerSort = composerSorts[0]
 	}
-	conductor, err := mp4.readTag(boxes, "(c)con")
-	if err != nil  {
-		return nil, err
-	}
 	copyright, err := mp4.readTag(boxes, "cprt")
 	if err != nil  {
 		return nil, err
@@ -583,9 +586,17 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		return nil, err
 	}
 
-	artistID, err := mp4.readITArtistID(boxes)
+	artistIDs, err := mp4.readItunesIDs(boxes, "atID")
 	if err != nil  {
 		return nil, err
+	}
+	composerIDs, err := mp4.readItunesIDs(boxes, "cmID")
+	if err != nil {
+		return nil, err
+	}
+	artistID := int32(-1)
+	if len(artistIDs) > 0 && artistIDs[0] <= math.MaxInt32 {
+		artistID = int32(artistIDs[0])
 	}
 
 	albumArtistSorts, err := mp4.readTextValues(boxes, "soaa")
@@ -618,6 +629,31 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if storefrontIDData != nil {
 		storefrontID = binary.BigEndian.Uint32(storefrontIDData)
 	}
+	releaseDate, err := mp4.readTag(boxes, "rldt")
+	if err != nil {
+		return nil, err
+	}
+	xid, err := mp4.readTag(boxes, "xid ")
+	if err != nil {
+		return nil, err
+	}
+	gaplessData, err := mp4.readItunesInteger(boxes, "pgap", 1)
+	if err != nil {
+		return nil, err
+	}
+	var gapless *bool
+	if gaplessData != nil {
+		value := gaplessData[0] != 0
+		gapless = &value
+	}
+	genreIDs, err := mp4.readItunesIDs(boxes, "geID")
+	if err != nil {
+		return nil, err
+	}
+	var genreID uint32
+	if len(genreIDs) > 0 && genreIDs[0] <= math.MaxUint32 {
+		genreID = uint32(genreIDs[0])
+	}
 	mediaTypeData, err := mp4.readItunesInteger(boxes, "stik", 1)
 	if err != nil {
 		return nil, err
@@ -647,7 +683,6 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Directors: directors,
 		Composers: composers,
 		ComposerSorts: composerSorts,
-		Conductor: conductor,
 		Copyright: copyright,
 		Custom: custom,
 		CustomGenre: firstGenre,
@@ -659,8 +694,15 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		ItunesAdvisory: advisory,
 		ItunesAlbumID: albumID,
 		ItunesArtistID: artistID,
+		ItunesArtistIDs: artistIDs,
+		ItunesComposerIDs: composerIDs,
 		ItunesCatalogID: catalogID,
 		ItunesStorefrontID: storefrontID,
+		XID: xid,
+		ReleaseDate: releaseDate,
+		ItunesGapless: gapless,
+		ItunesGenreID: genreID,
+		ItunesGenreIDs: genreIDs,
 		ItunesMediaType: mediaType,
 		Lyrics: lyrics,
 		Narrator: narrator,
@@ -670,6 +712,26 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Title: title,
 		TrackNumber: trackNum,
 		TrackTotal: trackTotal,
+	}
+
+	for _, role := range tags.nativeCreditLists() {
+		name := role.atom
+		if name[0] == 0xa9 {
+			name = "(c)" + name[1:]
+		}
+		values, err := mp4.readTextValues(boxes, name)
+		if err != nil {
+			return nil, err
+		}
+		*role.values = values
+	}
+	tags.Conductor = firstTextValue(tags.Conductors)
+
+	if tags.ISRC, err = mp4.readUserDataText(boxes, "(c)isr"); err != nil {
+		return nil, err
+	}
+	if tags.RecordLabel, err = mp4.readUserDataText(boxes, "(c)lab"); err != nil {
+		return nil, err
 	}
 
 	year, err := mp4.readTag(boxes, "(c)day")

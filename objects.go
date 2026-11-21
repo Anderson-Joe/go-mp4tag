@@ -45,11 +45,11 @@ var ftyps = [8][]byte{
 var containers = []string{
   "moov", "udta", "meta", "ilst", "----", "(c)alb",
   "aART", "(c)art", "(c)nam", "(c)cmt", "(c)gen", "gnre",
-  "(c)wrt", "(c)con", "(c)dir", "cprt", "desc", "(c)lyr", "(c)nrt",
+  "(c)wrt", "(c)con", "(c)dir", "(c)arg", "(c)prd", "(c)sne", "perf", "cprt", "desc", "(c)lyr", "(c)nrt",
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
-  "atID", "tmpo", "sonm", "soal", "soar", "soco",
-  "soaa", "cpil", "cnID", "sfID", "stik",
+  "atID", "cmID", "tmpo", "sonm", "soal", "soar", "soco",
+  "soaa", "cpil", "cnID", "sfID", "stik", "xid ", "pgap", "geID", "rldt",
 }
 
 // 0-9
@@ -300,6 +300,9 @@ type MP4Tags struct {
 	Composers     []string
 	ComposerSorts []string
 	Conductor string
+	// These ordered role lists use the native ©arg, ©con, ©sne, perf, and ©prd atoms.
+	// A non-nil empty list clears the corresponding atom.
+	Arrangers, Conductors, Engineers, Performers, Producers []string
 	Copyright string
 	Custom map[string]string
 	CustomGenre string // First ©gen value on read; used on write when CustomGenres is nil.
@@ -317,10 +320,27 @@ type MP4Tags struct {
 	ItunesAdvisory ItunesAdvisory
 	ItunesAlbumID int32
 	ItunesArtistID int32
+	// ItunesArtistIDs and ItunesComposerIDs hold ordered native atID and cmID values.
+	// An empty non-nil slice clears the corresponding tag.
+	ItunesArtistIDs []uint64
+	ItunesComposerIDs []uint64
 	// ItunesCatalogID is the native cnID. Zero means absent.
 	ItunesCatalogID uint32
 	// ItunesStorefrontID is the native sfID. Zero means absent.
 	ItunesStorefrontID uint32
+	// XID is the vendor-supplied xid atom. An empty value leaves it unchanged.
+	XID string
+	// ISRC and RecordLabel are native QuickTime UserData text values.
+	ISRC string
+	RecordLabel string
+	// ReleaseDate holds the native rldt value independently of Date (©day).
+	ReleaseDate string
+	// ItunesGapless holds pgap. Nil leaves the existing flag unchanged.
+	ItunesGapless *bool
+	// ItunesGenreID holds geID. Zero leaves it unchanged.
+	ItunesGenreID uint32
+	// ItunesGenreIDs holds all geID values in genre order. An empty non-nil slice clears geID.
+	ItunesGenreIDs []uint64
 	// ItunesMediaType is the native stik value. A nil pointer leaves it unchanged.
 	ItunesMediaType *ItunesMediaType
 	Lyrics string
