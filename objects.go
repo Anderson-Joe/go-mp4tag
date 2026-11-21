@@ -49,7 +49,7 @@ var containers = []string{
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
   "atID", "tmpo", "sonm", "soal", "soar", "soco",
-  "soaa", "cnID", "stik",
+  "soaa", "cnID", "sfID", "stik",
 }
 
 // 0-9
@@ -303,6 +303,8 @@ type MP4Tags struct {
 	ItunesArtistID int32
 	// ItunesCatalogID is the native cnID. Zero means absent.
 	ItunesCatalogID uint32
+	// ItunesStorefrontID is the native sfID. Zero means absent.
+	ItunesStorefrontID uint32
 	// ItunesMediaType is the native stik value. A nil pointer leaves it unchanged.
 	ItunesMediaType *ItunesMediaType
 	Lyrics string

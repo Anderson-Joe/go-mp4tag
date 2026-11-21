@@ -119,6 +119,9 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	if containsStr(delStrings, "itunescatalogid") {
 		mergedTags.ItunesCatalogID = 0
 	}
+	if containsStr(delStrings, "itunesstorefrontid") || containsStr(delStrings, "itunescountryid") {
+		mergedTags.ItunesStorefrontID = 0
+	}
 	if containsStr(delStrings, "itunesmediatype") {
 		mergedTags.ItunesMediaType = nil
 	}
@@ -247,6 +250,9 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	}
 	if tags.ItunesCatalogID != 0 {
 		mergedTags.ItunesCatalogID = tags.ItunesCatalogID
+	}
+	if tags.ItunesStorefrontID != 0 {
+		mergedTags.ItunesStorefrontID = tags.ItunesStorefrontID
 	}
 	if tags.ItunesMediaType != nil {
 		mergedTags.ItunesMediaType = tags.ItunesMediaType
@@ -1165,6 +1171,13 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		var catalogID [4]byte
 		binary.BigEndian.PutUint32(catalogID[:], tags.ItunesCatalogID)
 		if err := writeItunesInteger(f, "cnID", catalogID[:]); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesStorefrontID != 0 {
+		var storefrontID [4]byte
+		binary.BigEndian.PutUint32(storefrontID[:], tags.ItunesStorefrontID)
+		if err := writeItunesInteger(f, "sfID", storefrontID[:]); err != nil {
 			return err
 		}
 	}
