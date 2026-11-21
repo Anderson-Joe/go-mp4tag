@@ -277,9 +277,13 @@ type MP4Tags struct {
 	Album string
 	AlbumSort string 
 	AlbumArtist string
+	AlbumArtists []string // ordered native values; see CustomGenres for replacement semantics.
 	AlbumArtistSort string
+	AlbumArtistSorts []string // ordered native values; see CustomGenres for replacement semantics.
 	Artist string
+	Artists []string // ordered native values; see CustomGenres for replacement semantics.
 	ArtistSort string
+	ArtistSorts []string // ordered native values; see CustomGenres for replacement semantics.
 	BPM int16
 	Comment string
 	Composer string

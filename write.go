@@ -38,10 +38,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "albumartist") {
 		mergedTags.AlbumArtist = ""
+		mergedTags.AlbumArtists = nil
 	}
 
 	if containsStr(delStrings,  "albumartistsort") {
 		mergedTags.AlbumArtistSort = ""
+		mergedTags.AlbumArtistSorts = nil
 	}
 
 	if containsStr(delStrings,  "albumsort") {
@@ -50,10 +52,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "artist") {
 		mergedTags.Artist = ""
+		mergedTags.Artists = nil
 	}
 
 	if containsStr(delStrings,  "artistsort") {
 		mergedTags.ArtistSort = ""
+		mergedTags.ArtistSorts = nil
 	}
 
 	if containsStr(delStrings,  "bpm") {
@@ -167,20 +171,36 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.AlbumSort = tags.AlbumSort
 	}
 
-	if tags.AlbumArtist != "" {
+	if tags.AlbumArtists != nil {
+		mergedTags.AlbumArtist = ""
+		mergedTags.AlbumArtists = tags.AlbumArtists
+	} else if tags.AlbumArtist != "" {
 		mergedTags.AlbumArtist = tags.AlbumArtist
+		mergedTags.AlbumArtists = nil
 	}
 
-	if tags.AlbumArtistSort != "" {
+	if tags.AlbumArtistSorts != nil {
+		mergedTags.AlbumArtistSort = ""
+		mergedTags.AlbumArtistSorts = tags.AlbumArtistSorts
+	} else if tags.AlbumArtistSort != "" {
 		mergedTags.AlbumArtistSort = tags.AlbumArtistSort
+		mergedTags.AlbumArtistSorts = nil
 	}
 
-	if tags.Artist != "" {
+	if tags.Artists != nil {
+		mergedTags.Artist = ""
+		mergedTags.Artists = tags.Artists
+	} else if tags.Artist != "" {
 		mergedTags.Artist = tags.Artist
+		mergedTags.Artists = nil
 	}
 
-	if tags.ArtistSort != "" {
+	if tags.ArtistSorts != nil {
+		mergedTags.ArtistSort = ""
+		mergedTags.ArtistSorts = tags.ArtistSorts
+	} else if tags.ArtistSort != "" {
 		mergedTags.ArtistSort = tags.ArtistSort
+		mergedTags.ArtistSorts = nil
 	}
 
 	if tags.BPM > 0 {
@@ -1068,28 +1088,44 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}
 
-	if tags.AlbumArtist != "" {
+	if len(tags.AlbumArtists) > 0 {
+		if err := writeTextValues(f, "aART", tags.AlbumArtists); err != nil {
+			return err
+		}
+	} else if tags.AlbumArtist != "" {
 		err = writeRegular(f, "aART", tags.AlbumArtist, false)
 		if err != nil {
 			return err
 		}
 	}
 
-	if tags.AlbumArtistSort != "" {
+	if len(tags.AlbumArtistSorts) > 0 {
+		if err := writeTextValues(f, "soaa", tags.AlbumArtistSorts); err != nil {
+			return err
+		}
+	} else if tags.AlbumArtistSort != "" {
 		err = writeRegular(f, "soaa", tags.AlbumArtistSort, false)
 		if err != nil {
 			return err
 		}
 	}
 
-	if tags.Artist != "" {
+	if len(tags.Artists) > 0 {
+		if err := writeTextValues(f, "\xa9ART", tags.Artists); err != nil {
+			return err
+		}
+	} else if tags.Artist != "" {
 		err = writeRegular(f, "ART", tags.Artist, true)
 		if err != nil {
 			return err
 		}
 	}
 
-	if tags.ArtistSort != "" {
+	if len(tags.ArtistSorts) > 0 {
+		if err := writeTextValues(f, "soar", tags.ArtistSorts); err != nil {
+			return err
+		}
+	} else if tags.ArtistSort != "" {
 		err = writeRegular(f, "soar", tags.ArtistSort, false)
 		if err != nil {
 			return err

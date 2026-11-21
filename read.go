@@ -176,6 +176,13 @@ func (mp4 MP4) readTag(boxes MP4Boxes, boxName string) (string, error) {
 	return tag, err
 }
 
+func firstTextValue(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
 func (mp4 MP4) readTextValues(boxes MP4Boxes, name string) ([]string, error) {
 	var values []string
 	for _, box := range boxes.getBoxesByPath("moov.udta.meta.ilst." + name + ".data") {
@@ -434,11 +441,11 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if err != nil  {
 		return nil, err
 	}
-	albumArtist, err := mp4.readTag(boxes, "aART")
+	albumArtists, err := mp4.readTextValues(boxes, "aART")
 	if err != nil  {
 		return nil, err
 	}
-	artist, err := mp4.readTag(boxes, "(c)art")
+	artists, err := mp4.readTextValues(boxes, "(c)art")
 	if err != nil  {
 		return nil, err
 	}
@@ -536,14 +543,29 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		return nil, err
 	}
 
+	albumArtistSorts, err := mp4.readTextValues(boxes, "soaa")
+	if err != nil {
+		return nil, err
+	}
+	artistSorts, err := mp4.readTextValues(boxes, "soar")
+	if err != nil {
+		return nil, err
+	}
+
 	var firstGenre string
 	if len(customGenres) > 0 {
 		firstGenre = customGenres[0]
 	}
 	tags := &MP4Tags{
 		Album: album,
-		AlbumArtist: albumArtist,
-		Artist: artist,
+		AlbumArtist: firstTextValue(albumArtists),
+		AlbumArtists: albumArtists,
+		AlbumArtistSort: firstTextValue(albumArtistSorts),
+		AlbumArtistSorts: albumArtistSorts,
+		Artist: firstTextValue(artists),
+		Artists: artists,
+		ArtistSort: firstTextValue(artistSorts),
+		ArtistSorts: artistSorts,
 		BPM: bpm,
 		Comment: comment,
 		Composer: composer,
