@@ -64,6 +64,10 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.Comment = ""
 	}
 
+	if containsStr(delStrings, "compilation") {
+		mergedTags.Compilation = nil
+	}
+
 	if containsStr(delStrings,  "composer") {
 		mergedTags.Composer = ""
 	}
@@ -186,6 +190,10 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if tags.Comment != "" {
 		mergedTags.Comment = tags.Comment
+	}
+
+	if tags.Compilation != nil {
+		mergedTags.Compilation = tags.Compilation
 	}
 
 	if tags.Composer != "" {
@@ -634,6 +642,12 @@ func writeBPM(f *os.File, bpm int16) error {
 	}
 	bpmBytes := putI16BE(bpm)
 	_, err = f.Write(bpmBytes)
+	return err
+}
+
+func writeCompilation(f *os.File) error {
+	// cpil contains a one-byte integer in its data box.
+	_, err := f.WriteString("\x00\x00\x00\x19cpil\x00\x00\x00\x11data\x00\x00\x00\x15\x00\x00\x00\x00\x01")
 	return err
 }
 
@@ -1110,6 +1124,12 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 	if tags.Conductor != "" {
 		err = writeRegular(f, "con", tags.Conductor, true)
 		if err != nil {
+			return err
+		}
+	}
+
+	if tags.Compilation != nil && *tags.Compilation {
+		if err := writeCompilation(f); err != nil {
 			return err
 		}
 	}

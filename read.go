@@ -368,6 +368,26 @@ func (mp4 MP4) readITArtistID(boxes MP4Boxes) (int32, error) {
 	return id, err
 }
 
+func (mp4 MP4) readCompilation(boxes MP4Boxes) (*bool, error) {
+	box := boxes.getBoxByPath("moov.udta.meta.ilst.cpil.data")
+	if box == nil {
+		return nil, nil
+	}
+	offset := box.HeaderSize + 8
+	if box.BoxSize <= offset {
+		return nil, fmt.Errorf("missing value in cpil data box")
+	}
+	if _, err := mp4.f.Seek(box.EndOffset-1, io.SeekStart); err != nil {
+		return nil, err
+	}
+	value, err := mp4.readByte()
+	if err != nil {
+		return nil, err
+	}
+	compilation := value != 0
+	return &compilation, nil
+}
+
 func (mp4 MP4) readAdvisory(boxes MP4Boxes) (ItunesAdvisory, error) {
 	none := ItunesAdvisoryNone
 	box := boxes.getBoxByPath("moov.udta.meta.ilst.rtng.data")
@@ -491,6 +511,10 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		return nil, err
 	}
 
+	compilation, err := mp4.readCompilation(boxes)
+	if err != nil {
+		return nil, err
+	}
 	advisory, err := mp4.readAdvisory(boxes)
 	if err != nil  {
 		return nil, err
@@ -512,6 +536,7 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Artist: artist,
 		BPM: bpm,
 		Comment: comment,
+		Compilation: compilation,
 		Composer: composer,
 		Conductor: conductor,
 		Copyright: copyright,

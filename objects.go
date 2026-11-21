@@ -49,7 +49,7 @@ var containers = []string{
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
   "atID", "tmpo", "sonm", "soal", "soar", "soco",
-  "soaa",
+  "soaa", "cpil",
 }
 
 // 0-9
@@ -282,6 +282,9 @@ type MP4Tags struct {
 	ArtistSort string
 	BPM int16
 	Comment string
+	// Compilation controls the native cpil flag. nil leaves it unchanged on
+	// write, true sets it, and false removes it. On read, nil means absent.
+	Compilation *bool
 	Composer string
 	ComposerSort string
 	Conductor string
