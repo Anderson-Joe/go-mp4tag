@@ -284,6 +284,10 @@ type MP4Tags struct {
 	Comment string
 	Composer string
 	ComposerSort string
+	// Composers and ComposerSorts hold ordered native ©wrt and soco values.
+	// A non-nil slice replaces the corresponding legacy string field on write.
+	Composers     []string
+	ComposerSorts []string
 	Conductor string
 	Copyright string
 	Custom map[string]string

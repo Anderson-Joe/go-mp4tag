@@ -66,10 +66,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "composer") {
 		mergedTags.Composer = ""
+		mergedTags.Composers = nil
 	}
 
 	if containsStr(delStrings,  "composersort") {
 		mergedTags.ComposerSort = ""
+		mergedTags.ComposerSorts = nil
 	}
 
 	if containsStr(delStrings,  "conductor") {
@@ -189,12 +191,20 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.Comment = tags.Comment
 	}
 
-	if tags.Composer != "" {
+	if tags.Composers != nil {
+		mergedTags.Composer = ""
+		mergedTags.Composers = tags.Composers
+	} else if tags.Composer != "" {
 		mergedTags.Composer = tags.Composer
+		mergedTags.Composers = nil
 	}
 
-	if tags.ComposerSort != "" {
+	if tags.ComposerSorts != nil {
+		mergedTags.ComposerSort = ""
+		mergedTags.ComposerSorts = tags.ComposerSorts
+	} else if tags.ComposerSort != "" {
 		mergedTags.ComposerSort = tags.ComposerSort
+		mergedTags.ComposerSorts = nil
 	}
 	if tags.Conductor != "" {
 		mergedTags.Conductor = tags.Conductor
@@ -1093,14 +1103,22 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}
 
-	if tags.Composer != "" {
+	if len(tags.Composers) > 0 {
+		if err := writeTextValues(f, "\xa9wrt", tags.Composers); err != nil {
+			return err
+		}
+	} else if tags.Composer != "" {
 		err = writeRegular(f, "wrt", tags.Composer, true)
 		if err != nil {
 			return err
 		}
 	}
 
-	if tags.ComposerSort != "" {
+	if len(tags.ComposerSorts) > 0 {
+		if err := writeTextValues(f, "soco", tags.ComposerSorts); err != nil {
+			return err
+		}
+	} else if tags.ComposerSort != "" {
 		err = writeRegular(f, "soco", tags.ComposerSort, false)
 		if err != nil {
 			return err

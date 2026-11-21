@@ -451,9 +451,20 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if err != nil  {
 		return nil, err
 	}
-	composer, err := mp4.readTag(boxes, "(c)wrt")
+	composers, err := mp4.readTextValues(boxes, "(c)wrt")
 	if err != nil  {
 		return nil, err
+	}
+	composerSorts, err := mp4.readTextValues(boxes, "soco")
+	if err != nil {
+		return nil, err
+	}
+	var composer, composerSort string
+	if len(composers) > 0 {
+		composer = composers[0]
+	}
+	if len(composerSorts) > 0 {
+		composerSort = composerSorts[0]
 	}
 	conductor, err := mp4.readTag(boxes, "(c)con")
 	if err != nil  {
@@ -536,6 +547,9 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		BPM: bpm,
 		Comment: comment,
 		Composer: composer,
+		ComposerSort: composerSort,
+		Composers: composers,
+		ComposerSorts: composerSorts,
 		Conductor: conductor,
 		Copyright: copyright,
 		Custom: custom,
