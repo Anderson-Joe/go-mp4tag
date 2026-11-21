@@ -495,6 +495,10 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if err != nil  {
 		return nil, err
 	}
+	directors, err := mp4.readTextValues(boxes, "(c)dir")
+	if err != nil {
+		return nil, err
+	}
 	composers, err := mp4.readTextValues(boxes, "(c)wrt")
 	if err != nil  {
 		return nil, err
@@ -639,6 +643,8 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Compilation: compilation,
 		Composer: composer,
 		ComposerSort: composerSort,
+		Director: firstTextValue(directors),
+		Directors: directors,
 		Composers: composers,
 		ComposerSorts: composerSorts,
 		Conductor: conductor,
