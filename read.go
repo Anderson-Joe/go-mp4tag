@@ -414,6 +414,23 @@ func (mp4 MP4) readCompilation(boxes MP4Boxes) (*bool, error) {
 	return &compilation, nil
 }
 
+func (mp4 MP4) readItunesInteger(boxes MP4Boxes, name string, width int64) ([]byte, error) {
+	box := boxes.getBoxByPath("moov.udta.meta.ilst." + name + ".data")
+	if box == nil {
+		return nil, nil
+	}
+	offset := box.HeaderSize + 8
+	if box.BoxSize != offset+width {
+		return nil, fmt.Errorf("invalid integer payload size for %s", name)
+	}
+	if _, err := mp4.f.Seek(box.StartOffset+offset, io.SeekStart); err != nil {
+		return nil, err
+	}
+	data := make([]byte, width)
+	_, err := io.ReadFull(mp4.f, data)
+	return data, err
+}
+
 func (mp4 MP4) readAdvisory(boxes MP4Boxes) (ItunesAdvisory, error) {
 	none := ItunesAdvisoryNone
 	box := boxes.getBoxByPath("moov.udta.meta.ilst.rtng.data")
@@ -580,6 +597,33 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if len(customGenres) > 0 {
 		firstGenre = customGenres[0]
 	}
+
+	catalogIDData, err := mp4.readItunesInteger(boxes, "cnID", 4)
+	if err != nil {
+		return nil, err
+	}
+	var catalogID uint32
+	if catalogIDData != nil {
+		catalogID = binary.BigEndian.Uint32(catalogIDData)
+	}
+	storefrontIDData, err := mp4.readItunesInteger(boxes, "sfID", 4)
+	if err != nil {
+		return nil, err
+	}
+	var storefrontID uint32
+	if storefrontIDData != nil {
+		storefrontID = binary.BigEndian.Uint32(storefrontIDData)
+	}
+	mediaTypeData, err := mp4.readItunesInteger(boxes, "stik", 1)
+	if err != nil {
+		return nil, err
+	}
+	var mediaType *ItunesMediaType
+	if mediaTypeData != nil {
+		value := ItunesMediaType(mediaTypeData[0])
+		mediaType = &value
+	}
+
 	tags := &MP4Tags{
 		Album: album,
 		AlbumArtist: firstTextValue(albumArtists),
@@ -609,6 +653,9 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		ItunesAdvisory: advisory,
 		ItunesAlbumID: albumID,
 		ItunesArtistID: artistID,
+		ItunesCatalogID: catalogID,
+		ItunesStorefrontID: storefrontID,
+		ItunesMediaType: mediaType,
 		Lyrics: lyrics,
 		Narrator: narrator,
 		OtherCustom: otherCustom,

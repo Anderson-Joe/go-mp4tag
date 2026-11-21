@@ -127,6 +127,16 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.ItunesAlbumID = 0
 	}	
 
+	if containsStr(delStrings, "itunescatalogid") {
+		mergedTags.ItunesCatalogID = 0
+	}
+	if containsStr(delStrings, "itunesstorefrontid") || containsStr(delStrings, "itunescountryid") {
+		mergedTags.ItunesStorefrontID = 0
+	}
+	if containsStr(delStrings, "itunesmediatype") {
+		mergedTags.ItunesMediaType = nil
+	}
+
 	if containsStr(delStrings,  "itunesartistid") {
 		mergedTags.ItunesArtistID = 0
 	}
@@ -280,6 +290,15 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if tags.ItunesArtistID > 0 {
 		mergedTags.ItunesArtistID = tags.ItunesArtistID
+	}
+	if tags.ItunesCatalogID != 0 {
+		mergedTags.ItunesCatalogID = tags.ItunesCatalogID
+	}
+	if tags.ItunesStorefrontID != 0 {
+		mergedTags.ItunesStorefrontID = tags.ItunesStorefrontID
+	}
+	if tags.ItunesMediaType != nil {
+		mergedTags.ItunesMediaType = tags.ItunesMediaType
 	}
 
 	if tags.Lyrics != "" {
@@ -738,6 +757,20 @@ func writeAdvisory(f *os.File, advisory ItunesAdvisory) error {
 		return err
 	}	
 	_, err = f.Write([]byte{byte(advisory)})
+	return err
+}
+
+func writeItunesInteger(f *os.File, name string, value []byte) error {
+	var header [24]byte
+	binary.BigEndian.PutUint32(header[0:4], uint32(len(header)+len(value)))
+	copy(header[4:8], name)
+	binary.BigEndian.PutUint32(header[8:12], uint32(16+len(value)))
+	copy(header[12:16], "data")
+	binary.BigEndian.PutUint32(header[16:20], 21) // iTunes integer data type.
+	if _, err := f.Write(header[:]); err != nil {
+		return err
+	}
+	_, err := f.Write(value)
 	return err
 }
 
@@ -1243,6 +1276,25 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 	if tags.ItunesArtistID > 0  {
 		err = writeItunesArtistID(f, tags.ItunesArtistID)
 		if err != nil {
+			return err
+		}
+	}
+	if tags.ItunesCatalogID != 0 {
+		var catalogID [4]byte
+		binary.BigEndian.PutUint32(catalogID[:], tags.ItunesCatalogID)
+		if err := writeItunesInteger(f, "cnID", catalogID[:]); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesStorefrontID != 0 {
+		var storefrontID [4]byte
+		binary.BigEndian.PutUint32(storefrontID[:], tags.ItunesStorefrontID)
+		if err := writeItunesInteger(f, "sfID", storefrontID[:]); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesMediaType != nil {
+		if err := writeItunesInteger(f, "stik", []byte{byte(*tags.ItunesMediaType)}); err != nil {
 			return err
 		}
 	}
