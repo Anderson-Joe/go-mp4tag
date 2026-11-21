@@ -49,7 +49,7 @@ var containers = []string{
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
   "atID", "cmID", "tmpo", "sonm", "soal", "soar", "soco",
-  "soaa", "cpil", "cnID", "sfID", "stik", "xid ", "pgap", "geID",
+  "soaa", "cpil", "cnID", "sfID", "stik", "xid ", "pgap", "geID", "rldt",
 }
 
 // 0-9
@@ -330,6 +330,8 @@ type MP4Tags struct {
 	ItunesStorefrontID uint32
 	// XID is the vendor-supplied xid atom. An empty value leaves it unchanged.
 	XID string
+	// ReleaseDate holds the native rldt value independently of Date (©day).
+	ReleaseDate string
 	// ItunesGapless holds pgap. Nil leaves the existing flag unchanged.
 	ItunesGapless *bool
 	// ItunesGenreID holds geID. Zero leaves it unchanged.

@@ -629,6 +629,10 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if storefrontIDData != nil {
 		storefrontID = binary.BigEndian.Uint32(storefrontIDData)
 	}
+	releaseDate, err := mp4.readTag(boxes, "rldt")
+	if err != nil {
+		return nil, err
+	}
 	xid, err := mp4.readTag(boxes, "xid ")
 	if err != nil {
 		return nil, err
@@ -695,6 +699,7 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		ItunesCatalogID: catalogID,
 		ItunesStorefrontID: storefrontID,
 		XID: xid,
+		ReleaseDate: releaseDate,
 		ItunesGapless: gapless,
 		ItunesGenreID: genreID,
 		ItunesGenreIDs: genreIDs,
