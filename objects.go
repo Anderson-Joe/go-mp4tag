@@ -49,7 +49,7 @@ var containers = []string{
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
   "atID", "tmpo", "sonm", "soal", "soar", "soco",
-  "soaa",
+  "soaa", "cnID", "stik",
 }
 
 // 0-9
@@ -88,6 +88,10 @@ var resolveImageType = map[uint8]ImageType{
 	13: ImageTypeJPEG,
 	14: ImageTypePNG,
 }
+
+type ItunesMediaType uint8
+
+const ItunesMediaTypeMusic ItunesMediaType = 1
 
 type ItunesAdvisory int8
 const (
@@ -297,6 +301,10 @@ type MP4Tags struct {
 	ItunesAdvisory ItunesAdvisory
 	ItunesAlbumID int32
 	ItunesArtistID int32
+	// ItunesCatalogID is the native cnID. Zero means absent.
+	ItunesCatalogID uint32
+	// ItunesMediaType is the native stik value. A nil pointer leaves it unchanged.
+	ItunesMediaType *ItunesMediaType
 	Lyrics string
 	Narrator string
 	OtherCustom map[string][]string
