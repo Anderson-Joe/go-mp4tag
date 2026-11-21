@@ -134,6 +134,15 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	if containsStr(delStrings, "itunesstorefrontid") || containsStr(delStrings, "itunescountryid") {
 		mergedTags.ItunesStorefrontID = 0
 	}
+	if containsStr(delStrings, "xid") {
+		mergedTags.XID = ""
+	}
+	if containsStr(delStrings, "itunesgapless") {
+		mergedTags.ItunesGapless = nil
+	}
+	if containsStr(delStrings, "itunesgenreid") {
+		mergedTags.ItunesGenreID = 0
+	}
 	if containsStr(delStrings, "itunesmediatype") {
 		mergedTags.ItunesMediaType = nil
 	}
@@ -312,6 +321,15 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 	}
 	if tags.ItunesStorefrontID != 0 {
 		mergedTags.ItunesStorefrontID = tags.ItunesStorefrontID
+	}
+	if tags.XID != "" {
+		mergedTags.XID = tags.XID
+	}
+	if tags.ItunesGapless != nil {
+		mergedTags.ItunesGapless = tags.ItunesGapless
+	}
+	if tags.ItunesGenreID != 0 {
+		mergedTags.ItunesGenreID = tags.ItunesGenreID
 	}
 	if tags.ItunesMediaType != nil {
 		mergedTags.ItunesMediaType = tags.ItunesMediaType
@@ -1325,6 +1343,27 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		var storefrontID [4]byte
 		binary.BigEndian.PutUint32(storefrontID[:], tags.ItunesStorefrontID)
 		if err := writeItunesInteger(f, "sfID", storefrontID[:]); err != nil {
+			return err
+		}
+	}
+	if tags.XID != "" {
+		if err := writeRegular(f, "xid ", tags.XID, false); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesGapless != nil {
+		var value byte
+		if *tags.ItunesGapless {
+			value = 1
+		}
+		if err := writeItunesInteger(f, "pgap", []byte{value}); err != nil {
+			return err
+		}
+	}
+	if tags.ItunesGenreID != 0 {
+		var value [4]byte
+		binary.BigEndian.PutUint32(value[:], tags.ItunesGenreID)
+		if err := writeItunesInteger(f, "geID", value[:]); err != nil {
 			return err
 		}
 	}
