@@ -82,6 +82,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "customgenre") {
 		mergedTags.CustomGenre = ""
+		mergedTags.CustomGenres = nil
 	}
 
 	if containsStr(delStrings,  "date") {
@@ -203,8 +204,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.Copyright = tags.Copyright
 	}
 
-	if tags.CustomGenre != "" {
+	if tags.CustomGenres != nil {
+		mergedTags.CustomGenre = ""
+		mergedTags.CustomGenres = tags.CustomGenres
+	} else if tags.CustomGenre != "" {
 		mergedTags.CustomGenre = tags.CustomGenre
+		mergedTags.CustomGenres = nil
 	}
 
 	if tags.Date != "" {
@@ -525,6 +530,36 @@ func writeRegular(f *os.File, boxName, val string, prefix bool) error {
 
 	_, err = f.Write(valBytes)
 	return err
+}
+
+func writeTextValues(f *os.File, name string, values []string) error {
+	size := uint64(8)
+	for _, value := range values {
+		size += uint64(len(value)) + 16
+	}
+	if size > math.MaxUint32 {
+		return fmt.Errorf("text metadata item %q exceeds the 32-bit box size", name)
+	}
+
+	if _, err := f.Write(putI32BE(int32(size))); err != nil {
+		return err
+	}
+	if _, err := f.WriteString(name); err != nil {
+		return err
+	}
+	// Text items store each value in its own UTF-8 data box.
+	for _, value := range values {
+		if _, err := f.Write(putI32BE(int32(len(value) + 16))); err != nil {
+			return err
+		}
+		if _, err := f.WriteString("data\x00\x00\x00\x01\x00\x00\x00\x00"); err != nil {
+			return err
+		}
+		if _, err := f.WriteString(value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeGenre(f *os.File, genre Genre) error {
@@ -1086,9 +1121,12 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 		}
 	}
 
-	if tags.CustomGenre != "" {
-		err = writeRegular(f, "gen", tags.CustomGenre, true)
-		if err != nil {
+	if len(tags.CustomGenres) != 0 {
+		if err := writeTextValues(f, "\xa9gen", tags.CustomGenres); err != nil {
+			return err
+		}
+	} else if tags.CustomGenre != "" {
+		if err := writeRegular(f, "gen", tags.CustomGenre, true); err != nil {
 			return err
 		}
 	}

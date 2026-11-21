@@ -287,7 +287,10 @@ type MP4Tags struct {
 	Conductor string
 	Copyright string
 	Custom map[string]string
-	CustomGenre string
+	CustomGenre string // First ©gen value on read; used on write when CustomGenres is nil.
+	// CustomGenres holds the ordered native ©gen values. A non-nil slice replaces
+	// the existing values on write. An empty slice clears the field.
+	CustomGenres []string
 	Date string
 	Description string
 	Director string

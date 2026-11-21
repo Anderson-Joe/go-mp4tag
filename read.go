@@ -176,6 +176,25 @@ func (mp4 MP4) readTag(boxes MP4Boxes, boxName string) (string, error) {
 	return tag, err
 }
 
+func (mp4 MP4) readTextValues(boxes MP4Boxes, name string) ([]string, error) {
+	var values []string
+	for _, box := range boxes.getBoxesByPath("moov.udta.meta.ilst." + name + ".data") {
+		offset := box.HeaderSize + 8
+		if box.BoxSize < offset {
+			return nil, fmt.Errorf("invalid text data size for %s", name)
+		}
+		if _, err := mp4.f.Seek(box.StartOffset+offset, io.SeekStart); err != nil {
+			return nil, err
+		}
+		value, err := mp4.readString(box.BoxSize - offset)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
 func (mp4 MP4) readByte() (byte, error) {
 	buf := make([]byte, 1)
 	_, err := mp4.f.Read(buf)
@@ -448,7 +467,7 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	if err != nil  {
 		return nil, err
 	}	
-	customGenre, err := mp4.readTag(boxes, "(c)gen")
+	customGenres, err := mp4.readTextValues(boxes, "(c)gen")
 	if err != nil  {
 		return nil, err
 	}
@@ -506,6 +525,10 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		return nil, err
 	}
 
+	var firstGenre string
+	if len(customGenres) > 0 {
+		firstGenre = customGenres[0]
+	}
 	tags := &MP4Tags{
 		Album: album,
 		AlbumArtist: albumArtist,
@@ -516,7 +539,8 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 		Conductor: conductor,
 		Copyright: copyright,
 		Custom: custom,
-		CustomGenre: customGenre,
+		CustomGenre: firstGenre,
+		CustomGenres: customGenres,
 		Description: description,
 		DiscNumber: discNum,
 		DiscTotal: discTotal,
