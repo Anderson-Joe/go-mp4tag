@@ -444,7 +444,10 @@ func putI32BE(n int32) []byte {
 }
 
 func (mp4 MP4) updateChunkOffsets(outF *os.File, boxes MP4Boxes, oldIlistSize, newIlistSize int64) error {
-	delta := newIlistSize - oldIlistSize
+	return mp4.updateChunkOffsetsAt(outF, boxes, newIlistSize-oldIlistSize, 0)
+}
+
+func (mp4 MP4) updateChunkOffsetsAt(outF *os.File, boxes MP4Boxes, delta, shiftFrom int64) error {
 	if delta == 0 {
 		return nil
 	}
@@ -456,12 +459,12 @@ func (mp4 MP4) updateChunkOffsets(outF *os.File, boxes MP4Boxes, oldIlistSize, n
 	}
 
 	for _, stco := range stcos {
-		if err := mp4.updateStcoChunkOffsets(outF, stco, delta); err != nil {
+		if err := mp4.updateStcoChunkOffsets(outF, stco, delta, shiftFrom); err != nil {
 			return fmt.Errorf("update stco offsets: %w", err)
 		}
 	}
 	for _, co64 := range co64s {
-		if err := mp4.updateCo64ChunkOffsets(outF, co64, delta); err != nil {
+		if err := mp4.updateCo64ChunkOffsets(outF, co64, delta, shiftFrom); err != nil {
 			return fmt.Errorf("update co64 offsets: %w", err)
 		}
 	}
@@ -482,7 +485,7 @@ func (mp4 MP4) chunkOffsetCount(box *MP4Box) (int64, error) {
 	return int64(binary.BigEndian.Uint32(raw[:])), nil
 }
 
-func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) error {
+func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta, shiftFrom int64) error {
 	count, err := mp4.chunkOffsetCount(box)
 	if err != nil {
 		return err
@@ -494,7 +497,7 @@ func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	if _, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart); err != nil {
 		return err
 	}
-	if _, err := outF.Seek(box.StartOffset+16, io.SeekStart); err != nil {
+	if _, err := outF.Seek(chunkTablePosition(box, delta, shiftFrom), io.SeekStart); err != nil {
 		return err
 	}
 
@@ -520,7 +523,7 @@ func (mp4 MP4) updateStcoChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	return nil
 }
 
-func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta int64) error {
+func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta, shiftFrom int64) error {
 	count, err := mp4.chunkOffsetCount(box)
 	if err != nil {
 		return err
@@ -532,7 +535,7 @@ func (mp4 MP4) updateCo64ChunkOffsets(outF *os.File, box *MP4Box, delta int64) e
 	if _, err := mp4.f.Seek(box.StartOffset+16, io.SeekStart); err != nil {
 		return err
 	}
-	if _, err := outF.Seek(box.StartOffset+16, io.SeekStart); err != nil {
+	if _, err := outF.Seek(chunkTablePosition(box, delta, shiftFrom), io.SeekStart); err != nil {
 		return err
 	}
 
@@ -1539,6 +1542,7 @@ func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
 	if boxes.getBoxByPath("moov.udta.meta.ilst") == nil {
 		return &ErrBoxNotPresent{Msg: "ilst box not present, implement me"}
 	}
+	userData := userDataChanges(mergedTags, tags, delStrings)
 	mergedTags = overwriteTags(mergedTags, tags, delStrings)
 	if err := mp4.replaceCustomValues(mergedTags, tags.ReplaceCustomValues); err != nil {
 		return err
@@ -1547,6 +1551,12 @@ func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
    	err = mp4.writeTags(boxes, mergedTags, tempPath)
 	if err != nil {
 		return err
+	}
+	if len(userData) != 0 {
+		if err := rewriteUserData(tempPath, userData); err != nil {
+			_ = os.Remove(tempPath)
+			return err
+		}
 	}
 	mp4.Close()
 	err = moveMP4(tempPath, mp4.path)

@@ -330,6 +330,9 @@ type MP4Tags struct {
 	ItunesStorefrontID uint32
 	// XID is the vendor-supplied xid atom. An empty value leaves it unchanged.
 	XID string
+	// ISRC and RecordLabel are native QuickTime UserData text values.
+	ISRC string
+	RecordLabel string
 	// ReleaseDate holds the native rldt value independently of Date (©day).
 	ReleaseDate string
 	// ItunesGapless holds pgap. Nil leaves the existing flag unchanged.

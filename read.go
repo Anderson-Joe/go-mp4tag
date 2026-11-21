@@ -727,6 +727,13 @@ func (mp4 MP4) readTags(boxes MP4Boxes) (*MP4Tags, error) {
 	}
 	tags.Conductor = firstTextValue(tags.Conductors)
 
+	if tags.ISRC, err = mp4.readUserDataText(boxes, "(c)isr"); err != nil {
+		return nil, err
+	}
+	if tags.RecordLabel, err = mp4.readUserDataText(boxes, "(c)lab"); err != nil {
+		return nil, err
+	}
+
 	year, err := mp4.readTag(boxes, "(c)day")
 	if err != nil  {
 		return nil, err
