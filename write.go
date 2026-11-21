@@ -105,6 +105,7 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 
 	if containsStr(delStrings,  "director") {
 		mergedTags.Director = ""
+		mergedTags.Directors = nil
 	}
 
 	if containsStr(delStrings,  "discnumber") || containsStr(delStrings,  "disknumber") {
@@ -268,8 +269,12 @@ func overwriteTags(mergedTags, tags *MP4Tags, delStrings []string) *MP4Tags{
 		mergedTags.Description = tags.Description
 	}
 
-	if tags.Director != "" {
+	if tags.Directors != nil {
+		mergedTags.Director = ""
+		mergedTags.Directors = tags.Directors
+	} else if tags.Director != "" {
 		mergedTags.Director = tags.Director
+		mergedTags.Directors = nil
 	}
 
 	if tags.DiscNumber > 0 {
@@ -1182,6 +1187,16 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 	if tags.Comment != "" {
 		err = writeRegular(f, "cmt", tags.Comment, true)
 		if err != nil {
+			return err
+		}
+	}
+
+	if len(tags.Directors) > 0 {
+		if err := writeTextValues(f, "\xa9dir", tags.Directors); err != nil {
+			return err
+		}
+	} else if tags.Director != "" {
+		if err := writeRegular(f, "dir", tags.Director, true); err != nil {
 			return err
 		}
 	}

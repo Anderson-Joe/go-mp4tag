@@ -45,7 +45,7 @@ var ftyps = [8][]byte{
 var containers = []string{
   "moov", "udta", "meta", "ilst", "----", "(c)alb",
   "aART", "(c)art", "(c)nam", "(c)cmt", "(c)gen", "gnre",
-  "(c)wrt", "(c)con", "cprt", "desc", "(c)lyr", "(c)nrt",
+  "(c)wrt", "(c)con", "(c)dir", "cprt", "desc", "(c)lyr", "(c)nrt",
   "(c)pub", "trkn", "covr", "(c)day", "disk", "(c)too",
   "trak", "mdia", "minf", "stbl", "rtng", "plID",
   "atID", "tmpo", "sonm", "soal", "soar", "soco",
@@ -309,6 +309,8 @@ type MP4Tags struct {
 	Date string
 	Description string
 	Director string
+	// Directors holds ordered native ©dir values. An empty, non-nil slice clears the tag.
+	Directors []string
 	DiscNumber int16
 	DiscTotal int16
 	Genre Genre
