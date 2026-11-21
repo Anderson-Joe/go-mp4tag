@@ -303,6 +303,9 @@ type MP4Tags struct {
 	Lyrics string
 	Narrator string
 	OtherCustom map[string][]string
+	// ReplaceCustomValues is write-only. Each entry replaces all values for
+	// that freeform tag. A nil or empty slice removes that tag.
+	ReplaceCustomValues map[string][]string
 	Pictures []*MP4Picture
 	Publisher string
 	Title string

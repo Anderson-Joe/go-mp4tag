@@ -1260,6 +1260,43 @@ func (mp4 MP4) writeTags(boxes MP4Boxes, tags *MP4Tags, tempPath string) error {
 	return err
 }
 
+func (mp4 *MP4) replaceCustomValues(tags *MP4Tags, replacements map[string][]string) error {
+	seen := make(map[string]bool, len(replacements))
+	for key, values := range replacements {
+		canonical := key
+		if mp4.upperCustom {
+			canonical = strings.ToUpper(key)
+		}
+		if seen[canonical] {
+			return fmt.Errorf("duplicate replacement for custom tag %q", canonical)
+		}
+		seen[canonical] = true
+
+		// The legacy inputs may have supplied a differently cased spelling.
+		matches := func(name string) bool {
+			if mp4.upperCustom {
+				return strings.ToUpper(name) == canonical
+			}
+			return name == canonical
+		}
+		for name := range tags.Custom {
+			if matches(name) {
+				delete(tags.Custom, name)
+			}
+		}
+		for name := range tags.OtherCustom {
+			if matches(name) {
+				delete(tags.OtherCustom, name)
+			}
+		}
+		if len(values) != 0 {
+			tags.Custom[canonical] = values[0]
+			tags.OtherCustom[canonical] = values[1:]
+		}
+	}
+	return nil
+}
+
 func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
 	delStrings := strArrToLower(_delStrings)
 
@@ -1271,6 +1308,9 @@ func (mp4 *MP4) actualWrite(tags *MP4Tags, _delStrings []string) error {
 		return &ErrBoxNotPresent{Msg: "ilst box not present, implement me"}
 	}
 	mergedTags = overwriteTags(mergedTags, tags, delStrings)
+	if err := mp4.replaceCustomValues(mergedTags, tags.ReplaceCustomValues); err != nil {
+		return err
+	}
    	tempPath := getTempPath(mp4.path)
    	err = mp4.writeTags(boxes, mergedTags, tempPath)
 	if err != nil {
